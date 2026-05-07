@@ -1,6 +1,7 @@
 package telemetry
 
 import (
+	"fmt"
 	"math"
 	"sync"
 	"time"
@@ -8,6 +9,7 @@ import (
 	"github.com/alexbezu/goosd/internal/hud"
 	"github.com/bluenviron/gomavlib/v3"
 	"github.com/bluenviron/gomavlib/v3/pkg/dialects/common"
+	"github.com/bluenviron/gomavlib/v3/pkg/message"
 )
 
 type MAVLinkSource struct {
@@ -72,7 +74,7 @@ func (s *MAVLinkSource) run() {
 	}
 }
 
-func (s *MAVLinkSource) apply(message any, now time.Time) {
+func (s *MAVLinkSource) apply(message message.Message, now time.Time) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -81,21 +83,21 @@ func (s *MAVLinkSource) apply(message any, now time.Time) {
 	state.Health &^= hud.HealthTelemetryLost
 
 	switch msg := message.(type) {
-	case *common.MessageAttitude:
+	case *common.MessageAttitude: // 30
 		state.Attitude.RollDeg = radiansToDegrees(msg.Roll)
 		state.Attitude.PitchDeg = radiansToDegrees(msg.Pitch)
 		state.Attitude.YawDeg = normalize360(radiansToDegrees(msg.Yaw))
-	case *common.MessageVfrHud:
+	case *common.MessageVfrHud: // 74
 		state.Heading.Deg = normalize360(float64(msg.Heading))
 		state.AltitudeM = float64(msg.Alt)
 		state.SpeedMS = float64(msg.Groundspeed)
-	case *common.MessageGlobalPositionInt:
+	case *common.MessageGlobalPositionInt: // 33
 		if msg.Hdg != math.MaxUint16 {
 			state.Heading.Deg = normalize360(float64(msg.Hdg) / 100)
 		}
 		state.AltitudeM = float64(msg.Alt) / 1000
 		state.SpeedMS = math.Hypot(float64(msg.Vx), float64(msg.Vy)) / 100
-	case *common.MessageGpsRawInt:
+	case *common.MessageGpsRawInt: // 24
 		state.GPS.FixType = gpsFixType(msg.FixType)
 		state.GPS.Satellites = msg.SatellitesVisible
 		if msg.Eph != math.MaxUint16 {
@@ -112,6 +114,16 @@ func (s *MAVLinkSource) apply(message any, now time.Time) {
 		} else {
 			state.Health &^= hud.HealthLowBattery
 		}
+	case *common.MessageBatteryStatus: // 147
+		applyBatteryStatus(&state, msg)
+	case *common.MessageRcChannelsRaw: // 35
+		fmt.Printf("Throttle not implemented yet\n")
+	case *common.MessageRadioStatus: // 109
+		fmt.Printf("Radio Status not implemented yet\n")
+	case *common.MessageRawImu: // 27
+		// skipped
+	default:
+		fmt.Printf("Not implemented: %T\n", msg)
 	}
 
 	if state.Heading.Deg == 0 && state.Attitude.YawDeg != 0 {
@@ -119,6 +131,45 @@ func (s *MAVLinkSource) apply(message any, now time.Time) {
 	}
 
 	s.state = state
+}
+
+func applyBatteryStatus(state *hud.State, msg *common.MessageBatteryStatus) {
+	if msg.BatteryRemaining >= 0 {
+		state.Battery.RemainingPct = msg.BatteryRemaining
+		state.Battery.RemainingPctValid = true
+		if msg.BatteryRemaining <= 20 {
+			state.Health |= hud.HealthLowBattery
+		} else {
+			state.Health &^= hud.HealthLowBattery
+		}
+	}
+
+	if voltageMV, ok := batteryVoltageMV(msg); ok {
+		state.Battery.VoltageV = float64(voltageMV) / 1000
+		state.Battery.VoltageValid = true
+	}
+
+	if msg.CurrentBattery >= 0 {
+		state.Battery.CurrentA = float64(msg.CurrentBattery) / 100
+		state.Battery.CurrentValid = true
+	}
+}
+
+func batteryVoltageMV(msg *common.MessageBatteryStatus) (uint32, bool) {
+	var total uint32
+	for _, voltage := range msg.Voltages {
+		if voltage == 0 || voltage == math.MaxUint16 {
+			continue
+		}
+		total += uint32(voltage)
+	}
+	for _, voltage := range msg.VoltagesExt {
+		if voltage == 0 || voltage == math.MaxUint16 {
+			continue
+		}
+		total += uint32(voltage)
+	}
+	return total, total > 0
 }
 
 func heartbeatHealth(current hud.Health, msg *common.MessageHeartbeat) hud.Health {

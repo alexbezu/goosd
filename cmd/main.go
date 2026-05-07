@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"image/color"
@@ -11,8 +12,9 @@ import (
 	"github.com/alexbezu/goosd/internal/hud"
 	"github.com/alexbezu/goosd/internal/telemetry"
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+	"github.com/hajimehoshi/ebiten/v2/text/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
+	"golang.org/x/image/font/gofont/gomono"
 )
 
 const (
@@ -23,6 +25,7 @@ const (
 var (
 	hudGreen = color.RGBA{R: 96, G: 255, B: 142, A: 230}
 	hudDim   = color.RGBA{R: 96, G: 255, B: 142, A: 120}
+	hudFace  = mustHUDTextFace(16)
 )
 
 type Game struct {
@@ -97,9 +100,9 @@ func drawPitchLadder(screen *ebiten.Image, cx, cy float32, rollDeg, pitchDeg flo
 		if mark != 0 {
 			label := fmt.Sprintf("%d", int(math.Abs(float64(mark))))
 			lx, ly := rotate(width/2+12, y-8, sinRoll, cosRoll)
-			ebitenutil.DebugPrintAt(screen, label, int(cx+lx), int(cy+ly))
+			drawHUDText(screen, label, cx+lx, cy+ly, hudDim)
 			lx, ly = rotate(-width/2-28, y-8, sinRoll, cosRoll)
-			ebitenutil.DebugPrintAt(screen, label, int(cx+lx), int(cy+ly))
+			drawHUDText(screen, label, cx+lx, cy+ly, hudDim)
 		}
 	}
 }
@@ -126,16 +129,65 @@ func drawRollScale(screen *ebiten.Image, cx, cy float32, rollDeg float64) {
 	y := cy + (radius+14)*float32(math.Sin(roll))
 	vector.StrokeLine(screen, x, y, x-9, y+18, 2, hudGreen, true)
 	vector.StrokeLine(screen, x, y, x+9, y+18, 2, hudGreen, true)
-	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("ROLL %+03.0f", rollDeg), int(cx)-39, int(cy-radius)-34)
+	drawHUDText(screen, fmt.Sprintf("ROLL %+03.0f", rollDeg), cx-39, cy-radius-34, hudGreen)
 }
 
 func drawTapeText(screen *ebiten.Image, state hud.State) {
 	heading := normalize360(state.Heading.Deg)
-	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("HDG %03.0f", heading), screenWidth/2-30, 28)
-	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("SPD %03.0f m/s", state.SpeedMS), 44, screenHeight/2-8)
-	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("ALT %04.0f m", state.AltitudeM), screenWidth-128, screenHeight/2-8)
-	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("GPS %s %02d %.1f", state.GPS.FixType, state.GPS.Satellites, state.GPS.HDOP), 44, screenHeight-42)
-	ebitenutil.DebugPrintAt(screen, healthText(state.Health), screenWidth-152, screenHeight-42)
+	drawHUDText(screen, fmt.Sprintf("HDG %03.0f", heading), screenWidth/2-30, 28, hudGreen)
+	drawHUDText(screen, fmt.Sprintf("SPD %03.0f m/s", state.SpeedMS), 44, screenHeight/2-8, hudGreen)
+	drawHUDText(screen, fmt.Sprintf("ALT %04.0f m", state.AltitudeM), screenWidth-128, screenHeight/2-8, hudGreen)
+	drawHUDText(screen, fmt.Sprintf("GPS %s %02d %.1f", state.GPS.FixType, state.GPS.Satellites, state.GPS.HDOP), 44, screenHeight-42, hudGreen)
+	drawHUDText(screen, batteryText(state.Battery), 44, screenHeight-62, hudGreen)
+	drawHUDText(screen, healthText(state.Health), screenWidth-152, screenHeight-42, hudGreen)
+}
+
+func drawHUDText(screen *ebiten.Image, value string, x, y float32, foreground color.Color) {
+	drawText(screen, value, x-2, y, color.RGBA{A: 230})
+	drawText(screen, value, x+2, y, color.RGBA{A: 230})
+	drawText(screen, value, x, y-2, color.RGBA{A: 230})
+	drawText(screen, value, x, y+2, color.RGBA{A: 230})
+
+	drawText(screen, value, x-1, y-1, color.RGBA{R: 255, G: 255, B: 255, A: 210})
+	drawText(screen, value, x+1, y-1, color.RGBA{R: 255, G: 255, B: 255, A: 210})
+	drawText(screen, value, x-1, y+1, color.RGBA{R: 255, G: 255, B: 255, A: 210})
+	drawText(screen, value, x+1, y+1, color.RGBA{R: 255, G: 255, B: 255, A: 210})
+
+	drawText(screen, value, x, y, foreground)
+}
+
+func drawText(screen *ebiten.Image, value string, x, y float32, clr color.Color) {
+	options := &text.DrawOptions{}
+	options.GeoM.Translate(float64(x), float64(y))
+	options.ColorScale.ScaleWithColor(clr)
+	text.Draw(screen, value, hudFace, options)
+}
+
+func mustHUDTextFace(size float64) text.Face {
+	source, err := text.NewGoTextFaceSource(bytes.NewReader(gomono.TTF))
+	if err != nil {
+		panic(err)
+	}
+	return &text.GoTextFace{
+		Source: source,
+		Size:   size,
+	}
+}
+
+func batteryText(battery hud.Battery) string {
+	pct := "--"
+	if battery.RemainingPctValid {
+		pct = fmt.Sprintf("%d%%", battery.RemainingPct)
+	}
+	voltage := "--.-V"
+	if battery.VoltageValid {
+		voltage = fmt.Sprintf("%.1fV", battery.VoltageV)
+	}
+	current := "--.-A"
+	if battery.CurrentValid {
+		current = fmt.Sprintf("%.1fA", battery.CurrentA)
+	}
+	return fmt.Sprintf("BAT %s %s %s", pct, voltage, current)
 }
 
 func healthText(health hud.Health) string {

@@ -53,3 +53,22 @@ func TestHealthTextPriority(t *testing.T) {
 		}
 	}
 }
+
+func TestBatteryText(t *testing.T) {
+	got := batteryText(hud.Battery{
+		RemainingPct:      73,
+		RemainingPctValid: true,
+		VoltageV:          11.1,
+		VoltageValid:      true,
+		CurrentA:          8.42,
+		CurrentValid:      true,
+	})
+	if got != "BAT 73% 11.1V 8.4A" {
+		t.Fatalf("batteryText() = %q, want %q", got, "BAT 73% 11.1V 8.4A")
+	}
+
+	got = batteryText(hud.Battery{})
+	if got != "BAT -- --.-V --.-A" {
+		t.Fatalf("batteryText() = %q, want %q", got, "BAT -- --.-V --.-A")
+	}
+}

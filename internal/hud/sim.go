@@ -24,6 +24,8 @@ func (s *Simulator) State(now time.Time) State {
 	heading := math.Mod(35+t*18, 360)
 	altitude := 120 + 18*math.Sin(t*0.25)
 	speed := 24 + 4*math.Sin(t*0.9)
+	volt := 16.8 - t/10
+	remain := int8((volt - 12) / (16.8 - 12) * 100)
 
 	return State{
 		Attitude: Attitude{
@@ -38,6 +40,14 @@ func (s *Simulator) State(now time.Time) State {
 			FixType:    GPSFix3D,
 			Satellites: 12,
 			HDOP:       0.9,
+		},
+		Battery: Battery{
+			RemainingPct:      remain,
+			RemainingPctValid: true,
+			VoltageV:          volt,
+			VoltageValid:      true,
+			CurrentA:          8.4,
+			CurrentValid:      true,
 		},
 		Health:    HealthArmed,
 		UpdatedAt: now,

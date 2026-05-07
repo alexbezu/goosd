@@ -10,6 +10,7 @@ type State struct {
 	AltitudeM float64
 	SpeedMS   float64
 	GPS       GPS
+	Battery   Battery
 	Health    Health
 	UpdatedAt time.Time
 }
@@ -28,6 +29,15 @@ type GPS struct {
 	FixType    GPSFixType
 	Satellites uint8
 	HDOP       float64
+}
+
+type Battery struct {
+	RemainingPct      int8
+	RemainingPctValid bool
+	VoltageV          float64
+	VoltageValid      bool
+	CurrentA          float64
+	CurrentValid      bool
 }
 
 type GPSFixType uint8

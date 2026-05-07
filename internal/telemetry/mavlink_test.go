@@ -37,6 +37,11 @@ func TestMAVLinkSourceApplyMessages(t *testing.T) {
 		Eph:               90,
 		SatellitesVisible: 11,
 	}, now)
+	source.apply(&common.MessageBatteryStatus{
+		Voltages:         [10]uint16{3700, 3710, 3690, math.MaxUint16, math.MaxUint16, math.MaxUint16, math.MaxUint16, math.MaxUint16, math.MaxUint16, math.MaxUint16},
+		CurrentBattery:   842,
+		BatteryRemaining: 73,
+	}, now)
 
 	state := source.State(now)
 
@@ -69,6 +74,15 @@ func TestMAVLinkSourceApplyMessages(t *testing.T) {
 	}
 	if state.GPS.HDOP != 0.9 {
 		t.Fatalf("hdop = %v, want 0.9", state.GPS.HDOP)
+	}
+	if !state.Battery.RemainingPctValid || state.Battery.RemainingPct != 73 {
+		t.Fatalf("battery pct = %v/%v, want valid 73", state.Battery.RemainingPctValid, state.Battery.RemainingPct)
+	}
+	if !state.Battery.VoltageValid || !closeEnough(state.Battery.VoltageV, 11.1) {
+		t.Fatalf("battery voltage = %v/%v, want valid 11.1", state.Battery.VoltageValid, state.Battery.VoltageV)
+	}
+	if !state.Battery.CurrentValid || !closeEnough(state.Battery.CurrentA, 8.42) {
+		t.Fatalf("battery current = %v/%v, want valid 8.42", state.Battery.CurrentValid, state.Battery.CurrentA)
 	}
 }
 
@@ -103,6 +117,32 @@ func TestGPSFixType(t *testing.T) {
 		if got := gpsFixType(test.in); got != test.want {
 			t.Fatalf("gpsFixType(%v) = %v, want %v", test.in, got, test.want)
 		}
+	}
+}
+
+func TestBatteryStatusLowAndUnknownValues(t *testing.T) {
+	source := &MAVLinkSource{}
+	now := time.Date(2026, 5, 7, 12, 0, 0, 0, time.UTC)
+
+	source.apply(&common.MessageBatteryStatus{
+		Voltages:         [10]uint16{math.MaxUint16, math.MaxUint16, math.MaxUint16, math.MaxUint16, math.MaxUint16, math.MaxUint16, math.MaxUint16, math.MaxUint16, math.MaxUint16, math.MaxUint16},
+		CurrentBattery:   -1,
+		BatteryRemaining: 20,
+	}, now)
+
+	state := source.State(now)
+
+	if !state.Health.Has(hud.HealthLowBattery) {
+		t.Fatal("battery remaining <= 20 should set low battery health")
+	}
+	if !state.Battery.RemainingPctValid || state.Battery.RemainingPct != 20 {
+		t.Fatalf("battery pct = %v/%v, want valid 20", state.Battery.RemainingPctValid, state.Battery.RemainingPct)
+	}
+	if state.Battery.VoltageValid {
+		t.Fatalf("battery voltage should be invalid, got %v", state.Battery.VoltageV)
+	}
+	if state.Battery.CurrentValid {
+		t.Fatalf("battery current should be invalid, got %v", state.Battery.CurrentA)
 	}
 }
 

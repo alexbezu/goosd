@@ -6,9 +6,12 @@ Golang OSD HUD overlay GUI
 - The Ebitengine window is transparent, frameless, and always on top.
 - Mouse click-through overlay mode is available with the `-click-through` flag.
 - The first HUD skeleton draws a center reticle, pitch ladder, roll scale, heading text, altitude, and speed.
+- HUD text uses Ebitengine `text/v2` with an embedded Go Mono font and dark/light outline passes for readability on mixed backgrounds.
 - The HUD DTO/state package defines attitude, heading, altitude, speed, GPS status, and health flags for MAVLink command mapping from [betaflight](https://github.com/betaflight/betaflight/blob/master/src/main/telemetry/mavlink.c).
 - MAVLink UDP input is available with `-mavlink-udp`, for example `go run ./cmd -mavlink-udp :16000`.
-- The MAVLink reader maps `ATTITUDE`, `VFR_HUD`, `GLOBAL_POSITION_INT`, `GPS_RAW_INT`, `HEARTBEAT`, and `SYS_STATUS` messages into the HUD DTO.
+- The MAVLink reader maps `ATTITUDE`, `VFR_HUD`, `GLOBAL_POSITION_INT`, `GPS_RAW_INT`, `HEARTBEAT`, `SYS_STATUS`, and `BATTERY_STATUS` messages into the HUD DTO.
 
 ## TODO
-- Later: add config for window size, position, always-on-top, click-through, and data source.
+- add config for window size, position, always-on-top, click-through, and data source.
+- background launcher
+`gst-launch-1.0 -v udpsrc port=5600 caps='application/x-rtp, media=(string)video, clock-rate=(int)90000, encoding-name=(string)H265' ! rtph265depay ! avdec_h265 ! videoconvert ! autovideosink sync=false`
