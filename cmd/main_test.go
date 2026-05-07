@@ -2,12 +2,13 @@ package main
 
 import (
 	"testing"
+	"time"
 
 	"github.com/alexbezu/goosd/internal/hud"
 )
 
 func TestLayoutUsesHUDSize(t *testing.T) {
-	game := NewGame()
+	game := NewGame(hud.NewSimulator(time.Now()))
 
 	width, height := game.Layout(1, 1)
 

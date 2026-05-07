@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/alexbezu/goosd/internal/hud"
+	"github.com/alexbezu/goosd/internal/telemetry"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/vector"
@@ -25,14 +26,18 @@ var (
 )
 
 type Game struct {
-	sim *hud.Simulator
-	now func() time.Time
+	source stateSource
+	now    func() time.Time
 }
 
-func NewGame() *Game {
+type stateSource interface {
+	State(time.Time) hud.State
+}
+
+func NewGame(source stateSource) *Game {
 	return &Game{
-		sim: hud.NewSimulator(time.Now()),
-		now: time.Now,
+		source: source,
+		now:    time.Now,
 	}
 }
 
@@ -41,7 +46,7 @@ func (g *Game) Update() error {
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
-	state := g.sim.State(g.now())
+	state := g.source.State(g.now())
 	drawHUD(screen, state)
 }
 
@@ -164,7 +169,24 @@ func rotate(x, y float32, sin, cos float64) (float32, float32) {
 
 func main() {
 	clickThrough := flag.Bool("click-through", false, "pass mouse input through the HUD window")
+	mavlinkUDP := flag.String("mavlink-udp", "", "listen address for MAVLink UDP input, for example :5600")
 	flag.Parse()
+
+	var (
+		source      stateSource = hud.NewSimulator(time.Now())
+		closeSource func()
+	)
+	if *mavlinkUDP != "" {
+		mavlinkSource, err := telemetry.NewMAVLinkSource(*mavlinkUDP)
+		if err != nil {
+			log.Fatal(err)
+		}
+		source = mavlinkSource
+		closeSource = mavlinkSource.Close
+	}
+	if closeSource != nil {
+		defer closeSource()
+	}
 
 	ebiten.SetWindowSize(screenWidth, screenHeight)
 	ebiten.SetWindowTitle("goosd")
@@ -175,7 +197,7 @@ func main() {
 	options := &ebiten.RunGameOptions{
 		ScreenTransparent: true,
 	}
-	if err := ebiten.RunGameWithOptions(NewGame(), options); err != nil {
+	if err := ebiten.RunGameWithOptions(NewGame(source), options); err != nil {
 		log.Fatal(err)
 	}
 }
