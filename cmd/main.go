@@ -143,15 +143,15 @@ func drawTapeText(screen *ebiten.Image, state hud.State) {
 }
 
 func drawHUDText(screen *ebiten.Image, value string, x, y float32, foreground color.Color) {
-	drawText(screen, value, x-2, y, color.RGBA{A: 230})
-	drawText(screen, value, x+2, y, color.RGBA{A: 230})
-	drawText(screen, value, x, y-2, color.RGBA{A: 230})
-	drawText(screen, value, x, y+2, color.RGBA{A: 230})
+	drawText(screen, value, x-1, y, color.RGBA{R: 31, G: 127, B: 31, A: 230})
+	drawText(screen, value, x+1, y, color.RGBA{R: 31, G: 127, B: 31, A: 230})
+	drawText(screen, value, x, y-1, color.RGBA{R: 31, G: 127, B: 31, A: 230})
+	drawText(screen, value, x, y+1, color.RGBA{R: 31, G: 127, B: 31, A: 230})
 
-	drawText(screen, value, x-1, y-1, color.RGBA{R: 255, G: 255, B: 255, A: 210})
-	drawText(screen, value, x+1, y-1, color.RGBA{R: 255, G: 255, B: 255, A: 210})
-	drawText(screen, value, x-1, y+1, color.RGBA{R: 255, G: 255, B: 255, A: 210})
-	drawText(screen, value, x+1, y+1, color.RGBA{R: 255, G: 255, B: 255, A: 210})
+	drawText(screen, value, x-1, y-1, color.RGBA{R: 0, G: 127, B: 127, A: 210})
+	drawText(screen, value, x+1, y-1, color.RGBA{R: 0, G: 127, B: 127, A: 210})
+	drawText(screen, value, x-1, y+1, color.RGBA{R: 0, G: 127, B: 127, A: 210})
+	drawText(screen, value, x+1, y+1, color.RGBA{R: 0, G: 127, B: 127, A: 210})
 
 	drawText(screen, value, x, y, foreground)
 }
