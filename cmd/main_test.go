@@ -1,0 +1,54 @@
+package main
+
+import (
+	"testing"
+
+	"github.com/alexbezu/goosd/internal/hud"
+)
+
+func TestLayoutUsesHUDSize(t *testing.T) {
+	game := NewGame()
+
+	width, height := game.Layout(1, 1)
+
+	if width != screenWidth || height != screenHeight {
+		t.Fatalf("Layout() = %dx%d, want %dx%d", width, height, screenWidth, screenHeight)
+	}
+}
+
+func TestNormalize360(t *testing.T) {
+	tests := []struct {
+		in   float64
+		want float64
+	}{
+		{-1, 359},
+		{0, 0},
+		{361, 1},
+		{720, 0},
+	}
+
+	for _, test := range tests {
+		if got := normalize360(test.in); got != test.want {
+			t.Fatalf("normalize360(%v) = %v, want %v", test.in, got, test.want)
+		}
+	}
+}
+
+func TestHealthTextPriority(t *testing.T) {
+	tests := []struct {
+		health hud.Health
+		want   string
+	}{
+		{0, "DISARMED"},
+		{hud.HealthArmed, "ARMED"},
+		{hud.HealthArmed | hud.HealthLowBattery, "LOW BAT"},
+		{hud.HealthArmed | hud.HealthTelemetryLost, "NO TELEMETRY"},
+		{hud.HealthArmed | hud.HealthFailsafe | hud.HealthLowBattery, "FAILSAFE"},
+	}
+
+	for _, test := range tests {
+		if got := healthText(test.health); got != test.want {
+			t.Fatalf("healthText(%v) = %q, want %q", test.health, got, test.want)
+		}
+	}
+}
