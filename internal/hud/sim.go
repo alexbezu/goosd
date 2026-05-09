@@ -49,6 +49,14 @@ func (s *Simulator) State(now time.Time) State {
 			CurrentA:          8.4,
 			CurrentValid:      true,
 		},
+		Radio: Radio{
+			RCRSSI:              82,
+			RCRSSIValid:         true,
+			WFBRSSIDBm:          -58,
+			WFBRSSIValid:        true,
+			WFBLinkQualityPct:   96,
+			WFBLinkQualityValid: true,
+		},
 		Health:    HealthArmed,
 		UpdatedAt: now,
 	}

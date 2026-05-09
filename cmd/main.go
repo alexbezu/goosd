@@ -61,7 +61,7 @@ func drawHUD(screen *ebiten.Image, state hud.State) {
 	cx := float32(screenWidth) / 2
 	cy := float32(screenHeight) / 2
 
-	drawPitchLadder(screen, cx, cy, state.Attitude.RollDeg, state.Attitude.PitchDeg)
+	drawPitchLadder(screen, cx, cy, -state.Attitude.RollDeg, state.Attitude.PitchDeg)
 	drawRollScale(screen, cx, cy, state.Attitude.RollDeg)
 	drawReticle(screen, cx, cy)
 	drawTapeText(screen, state)
@@ -86,7 +86,7 @@ func drawPitchLadder(screen *ebiten.Image, cx, cy float32, rollDeg, pitchDeg flo
 
 		width := float32(96)
 		if mark == 0 {
-			width = 156
+			width = 255
 		}
 		y := float32(offsetY)
 		x0, y0 := rotate(-width/2, y, sinRoll, cosRoll)
@@ -126,10 +126,10 @@ func drawRollScale(screen *ebiten.Image, cx, cy float32, rollDeg float64) {
 
 	roll := (rollDeg - 90) * math.Pi / 180
 	x := cx + (radius+14)*float32(math.Cos(roll))
-	y := cy + (radius+14)*float32(math.Sin(roll))
+	y := cy + (radius+14)*float32(math.Sin(roll)) + 33
 	vector.StrokeLine(screen, x, y, x-9, y+18, 2, hudGreen, true)
 	vector.StrokeLine(screen, x, y, x+9, y+18, 2, hudGreen, true)
-	drawHUDText(screen, fmt.Sprintf("ROLL %+03.0f", rollDeg), cx-39, cy-radius-34, hudGreen)
+	drawHUDText(screen, fmt.Sprintf("%+03.0f", rollDeg), x-19, y+19, hudGreen)
 }
 
 func drawTapeText(screen *ebiten.Image, state hud.State) {
@@ -139,6 +139,8 @@ func drawTapeText(screen *ebiten.Image, state hud.State) {
 	drawHUDText(screen, fmt.Sprintf("ALT %04.0f m", state.AltitudeM), screenWidth-128, screenHeight/2-8, hudGreen)
 	drawHUDText(screen, fmt.Sprintf("GPS %s %02d %.1f", state.GPS.FixType, state.GPS.Satellites, state.GPS.HDOP), 44, screenHeight-42, hudGreen)
 	drawHUDText(screen, batteryText(state.Battery), 44, screenHeight-62, hudGreen)
+	drawHUDText(screen, radioText(state.Radio), 44, screenHeight-82, hudGreen)
+	drawHUDText(screen, wfbText(state.Radio), screenWidth-168, screenHeight-62, hudGreen)
 	drawHUDText(screen, healthText(state.Health), screenWidth-152, screenHeight-42, hudGreen)
 }
 
@@ -188,6 +190,35 @@ func batteryText(battery hud.Battery) string {
 		current = fmt.Sprintf("%.1fA", battery.CurrentA)
 	}
 	return fmt.Sprintf("BAT %s %s %s", pct, voltage, current)
+}
+
+func radioText(radio hud.Radio) string {
+	if !radio.RCRSSIValid {
+		return "RC --%"
+	}
+	return fmt.Sprintf("RC %d%%", radio.RCRSSI)
+}
+
+func wfbText(radio hud.Radio) string {
+	if radio.WFBFlags.Has(hud.WFBLinkLost) {
+		return "WFB LINK LOST"
+	}
+
+	rssi := "---"
+	if radio.WFBRSSIValid {
+		rssi = fmt.Sprintf("%d", radio.WFBRSSIDBm)
+	}
+
+	linkQuality := "--"
+	if radio.WFBLinkQualityValid {
+		linkQuality = fmt.Sprintf("%d%%", radio.WFBLinkQualityPct)
+	}
+
+	if radio.WFBFlags.Has(hud.WFBLinkJammed) {
+		return fmt.Sprintf("WFB %s %s JAMMED", rssi, linkQuality)
+	}
+
+	return fmt.Sprintf("WFB %s %s F%d L%d", rssi, linkQuality, radio.WFBFECFixed, radio.WFBRxErrors)
 }
 
 func healthText(health hud.Health) string {

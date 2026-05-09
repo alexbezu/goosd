@@ -42,6 +42,16 @@ func TestMAVLinkSourceApplyMessages(t *testing.T) {
 		CurrentBattery:   842,
 		BatteryRemaining: 73,
 	}, now)
+	source.apply(&common.MessageRadioStatus{
+		Rssi:     198,
+		Remrssi:  87,
+		Remnoise: uint8(hud.WFBLinkJammed),
+		Rxerrors: 3,
+		Fixed:    12,
+	}, now)
+	source.apply(&common.MessageRcChannelsRaw{
+		Rssi: 72,
+	}, now)
 
 	state := source.State(now)
 
@@ -83,6 +93,21 @@ func TestMAVLinkSourceApplyMessages(t *testing.T) {
 	}
 	if !state.Battery.CurrentValid || !closeEnough(state.Battery.CurrentA, 8.42) {
 		t.Fatalf("battery current = %v/%v, want valid 8.42", state.Battery.CurrentValid, state.Battery.CurrentA)
+	}
+	if !state.Radio.RCRSSIValid || state.Radio.RCRSSI != 72 {
+		t.Fatalf("rc rssi = %v/%v, want valid 72", state.Radio.RCRSSIValid, state.Radio.RCRSSI)
+	}
+	if !state.Radio.WFBRSSIValid || state.Radio.WFBRSSIDBm != -58 {
+		t.Fatalf("wfb rssi = %v/%v, want valid -58", state.Radio.WFBRSSIValid, state.Radio.WFBRSSIDBm)
+	}
+	if !state.Radio.WFBLinkQualityValid || state.Radio.WFBLinkQualityPct != 87 {
+		t.Fatalf("wfb link quality = %v/%v, want valid 87", state.Radio.WFBLinkQualityValid, state.Radio.WFBLinkQualityPct)
+	}
+	if state.Radio.WFBRxErrors != 3 || state.Radio.WFBFECFixed != 12 {
+		t.Fatalf("wfb counters = F%d L%d, want F12 L3", state.Radio.WFBFECFixed, state.Radio.WFBRxErrors)
+	}
+	if !state.Radio.WFBFlags.Has(hud.WFBLinkJammed) {
+		t.Fatalf("wfb flags = %v, want jammed", state.Radio.WFBFlags)
 	}
 }
 
@@ -143,6 +168,66 @@ func TestBatteryStatusLowAndUnknownValues(t *testing.T) {
 	}
 	if state.Battery.CurrentValid {
 		t.Fatalf("battery current should be invalid, got %v", state.Battery.CurrentA)
+	}
+}
+
+func TestRadioStatusUnknownValues(t *testing.T) {
+	source := &MAVLinkSource{}
+	now := time.Date(2026, 5, 7, 12, 0, 0, 0, time.UTC)
+
+	source.apply(&common.MessageRadioStatus{
+		Rssi:     math.MaxUint8,
+		Remrssi:  math.MaxUint8,
+		Remnoise: uint8(hud.WFBLinkLost),
+		Rxerrors: 9,
+		Fixed:    4,
+	}, now)
+
+	state := source.State(now)
+
+	if state.Radio.RCRSSIValid {
+		t.Fatalf("rc rssi should be invalid, got %d", state.Radio.RCRSSI)
+	}
+	if state.Radio.WFBRSSIValid {
+		t.Fatalf("wfb rssi should be invalid, got %d", state.Radio.WFBRSSIDBm)
+	}
+	if state.Radio.WFBLinkQualityValid {
+		t.Fatalf("wfb link quality should be invalid, got %d", state.Radio.WFBLinkQualityPct)
+	}
+	if !state.Radio.WFBFlags.Has(hud.WFBLinkLost) {
+		t.Fatalf("wfb flags = %v, want link lost", state.Radio.WFBFlags)
+	}
+	if state.Radio.WFBRxErrors != 9 || state.Radio.WFBFECFixed != 4 {
+		t.Fatalf("wfb counters = F%d L%d, want F4 L9", state.Radio.WFBFECFixed, state.Radio.WFBRxErrors)
+	}
+}
+
+func TestRCRSSIFromRcChannelsMessages(t *testing.T) {
+	source := &MAVLinkSource{}
+	now := time.Date(2026, 5, 7, 12, 0, 0, 0, time.UTC)
+
+	source.apply(&common.MessageRcChannelsRaw{
+		Rssi: 254,
+	}, now)
+	state := source.State(now)
+	if !state.Radio.RCRSSIValid || state.Radio.RCRSSI != 100 {
+		t.Fatalf("raw rc rssi = %v/%v, want valid 100", state.Radio.RCRSSIValid, state.Radio.RCRSSI)
+	}
+
+	source.apply(&common.MessageRcChannels{
+		Rssi: 64,
+	}, now)
+	state = source.State(now)
+	if !state.Radio.RCRSSIValid || state.Radio.RCRSSI != 64 {
+		t.Fatalf("rc channels rssi = %v/%v, want valid 64", state.Radio.RCRSSIValid, state.Radio.RCRSSI)
+	}
+
+	source.apply(&common.MessageRcChannelsRaw{
+		Rssi: math.MaxUint8,
+	}, now)
+	state = source.State(now)
+	if !state.Radio.RCRSSIValid || state.Radio.RCRSSI != 64 {
+		t.Fatalf("invalid rssi should preserve previous value, got %v/%v", state.Radio.RCRSSIValid, state.Radio.RCRSSI)
 	}
 }
 

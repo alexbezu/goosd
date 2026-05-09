@@ -11,6 +11,7 @@ type State struct {
 	SpeedMS   float64
 	GPS       GPS
 	Battery   Battery
+	Radio     Radio
 	Health    Health
 	UpdatedAt time.Time
 }
@@ -38,6 +39,29 @@ type Battery struct {
 	VoltageValid      bool
 	CurrentA          float64
 	CurrentValid      bool
+}
+
+type Radio struct {
+	RCRSSI              uint8
+	RCRSSIValid         bool
+	WFBRSSIDBm          int8
+	WFBRSSIValid        bool
+	WFBLinkQualityPct   uint8
+	WFBLinkQualityValid bool
+	WFBRxErrors         uint16
+	WFBFECFixed         uint16
+	WFBFlags            WFBFlags
+}
+
+type WFBFlags uint8
+
+const (
+	WFBLinkLost WFBFlags = 1 << iota
+	WFBLinkJammed
+)
+
+func (f WFBFlags) Has(flag WFBFlags) bool {
+	return f&flag != 0
 }
 
 type GPSFixType uint8

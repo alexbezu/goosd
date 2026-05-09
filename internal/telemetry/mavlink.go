@@ -117,9 +117,11 @@ func (s *MAVLinkSource) apply(message message.Message, now time.Time) {
 	case *common.MessageBatteryStatus: // 147
 		applyBatteryStatus(&state, msg)
 	case *common.MessageRcChannelsRaw: // 35
-		fmt.Printf("Throttle not implemented yet\n")
+		applyRCRSSI(&state, msg.Rssi)
+	case *common.MessageRcChannels: // 65
+		applyRCRSSI(&state, msg.Rssi)
 	case *common.MessageRadioStatus: // 109
-		fmt.Printf("Radio Status not implemented yet\n")
+		applyRadioStatus(&state, msg)
 	case *common.MessageRawImu: // 27
 		// skipped
 	default:
@@ -131,6 +133,36 @@ func (s *MAVLinkSource) apply(message message.Message, now time.Time) {
 	}
 
 	s.state = state
+}
+
+func applyRCRSSI(state *hud.State, rssi uint8) {
+	if rssi == math.MaxUint8 {
+		return
+	}
+	state.Radio.RCRSSI = radioPercent(rssi)
+	state.Radio.RCRSSIValid = true
+}
+
+func applyRadioStatus(state *hud.State, msg *common.MessageRadioStatus) {
+	if msg.Rssi != math.MaxUint8 {
+		applyRCRSSI(state, msg.Rssi)
+		state.Radio.WFBRSSIDBm = int8(msg.Rssi)
+		state.Radio.WFBRSSIValid = true
+	}
+	if msg.Remrssi != math.MaxUint8 {
+		state.Radio.WFBLinkQualityPct = radioPercent(msg.Remrssi)
+		state.Radio.WFBLinkQualityValid = true
+	}
+	state.Radio.WFBRxErrors = msg.Rxerrors
+	state.Radio.WFBFECFixed = msg.Fixed
+	state.Radio.WFBFlags = hud.WFBFlags(msg.Remnoise)
+}
+
+func radioPercent(value uint8) uint8 {
+	if value > 100 {
+		return 100
+	}
+	return value
 }
 
 func applyBatteryStatus(state *hud.State, msg *common.MessageBatteryStatus) {
