@@ -108,6 +108,8 @@ func (s *MAVLinkSource) apply(message message.Message, now time.Time) {
 		}
 	case *common.MessageHeartbeat:
 		state.Health = heartbeatHealth(state.Health, msg)
+		state.Flight.Mode = flightMode(msg)
+		state.Flight.ModeValid = true
 	case *common.MessageSysStatus:
 		if msg.BatteryRemaining >= 0 && msg.BatteryRemaining <= 20 {
 			state.Health |= hud.HealthLowBattery
@@ -217,6 +219,38 @@ func heartbeatHealth(current hud.Health, msg *common.MessageHeartbeat) hud.Healt
 	}
 
 	return current
+}
+
+func flightMode(msg *common.MessageHeartbeat) string {
+	if msg.BaseMode&common.MAV_MODE_FLAG_AUTO_ENABLED != 0 {
+		return "AUTO"
+	}
+	if msg.BaseMode&common.MAV_MODE_FLAG_GUIDED_ENABLED != 0 {
+		return "GUIDED"
+	}
+	if msg.BaseMode&common.MAV_MODE_FLAG_STABILIZE_ENABLED != 0 {
+		return "STAB"
+	}
+	if msg.Autopilot == common.MAV_AUTOPILOT_GENERIC && msg.CustomMode == 1 {
+		return "ACRO"
+	}
+	if msg.BaseMode&common.MAV_MODE_FLAG_MANUAL_INPUT_ENABLED != 0 {
+		return "MANUAL"
+	}
+	if msg.Autopilot == common.MAV_AUTOPILOT_GENERIC && msg.CustomMode == 0 {
+		return "STAB"
+	}
+
+	switch {
+	case msg.BaseMode&common.MAV_MODE_FLAG_HIL_ENABLED != 0:
+		return "HIL"
+	case msg.BaseMode&common.MAV_MODE_FLAG_TEST_ENABLED != 0:
+		return "TEST"
+	case msg.BaseMode&common.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED != 0:
+		return fmt.Sprintf("CUSTOM %d", msg.CustomMode)
+	default:
+		return "UNKNOWN"
+	}
 }
 
 func gpsFixType(fix common.GPS_FIX_TYPE) hud.GPSFixType {

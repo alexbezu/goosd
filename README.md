@@ -72,6 +72,7 @@ The current HUD draws:
 - Battery percentage, voltage, and current
 - RC receiver RSSI
 - WFB RSSI, link quality, FEC fixed count, RX error count, and link flags
+- Flight mode
 - Health text: `ARMED`, `DISARMED`, `LOW BAT`, `NO TELEMETRY`, or `FAILSAFE`
 
 HUD text uses Ebitengine `text/v2` with the embedded Go Mono font. Text is drawn with outline passes to stay readable on both dark and light video backgrounds.
@@ -89,6 +90,7 @@ The state currently includes:
 - GPS fix status
 - Battery status
 - Radio and WFB link status
+- Flight mode
 - Health flags
 - Last update time
 
@@ -98,7 +100,7 @@ GoOSD uses `gomavlib` with the MAVLink common dialect.
 
 | MAVLink message | HUD fields |
 | --- | --- |
-| [`HEARTBEAT` (0)](https://mavlink.io/en/messages/common.html#HEARTBEAT) | Armed and failsafe health flags |
+| [`HEARTBEAT` (0)](https://mavlink.io/en/messages/common.html#HEARTBEAT) | Armed flag, failsafe health flag, flight mode |
 | [`SYS_STATUS` (1)](https://mavlink.io/en/messages/common.html#SYS_STATUS) | Low battery health flag |
 | [`GPS_RAW_INT` (24)](https://mavlink.io/en/messages/common.html#GPS_RAW_INT) | GPS fix type, satellites, HDOP, speed fallback |
 | [`ATTITUDE` (30)](https://mavlink.io/en/messages/common.html#ATTITUDE) | Roll, pitch, yaw |
@@ -135,6 +137,25 @@ Supported WFB flags:
 - `2`: link jammed
 
 `RC_CHANNELS_RAW.rssi` and `RC_CHANNELS.rssi` update the RC receiver RSSI display directly. A value of `255` is treated as invalid or unknown.
+
+### Flight Mode
+
+Flight mode is derived from `HEARTBEAT.base_mode` and `HEARTBEAT.custom_mode`.
+
+For Betaflight-compatible heartbeats, GoOSD follows the current telemetry convention:
+
+- `custom_mode = 1`: `ACRO`
+- `custom_mode = 0`: `STAB`
+
+For other MAVLink senders, GoOSD falls back to the standard mode flags in priority order:
+
+1. `AUTO`
+2. `GUIDED`
+3. `STAB`
+4. `MANUAL`
+5. `HIL`
+6. `TEST`
+7. `CUSTOM <custom_mode>`
 
 ## Development
 

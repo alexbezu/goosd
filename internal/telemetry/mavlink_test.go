@@ -19,7 +19,9 @@ func TestMAVLinkSourceApplyMessages(t *testing.T) {
 	now := time.Date(2026, 5, 7, 12, 0, 0, 0, time.UTC)
 
 	source.apply(&common.MessageHeartbeat{
+		Autopilot:    common.MAV_AUTOPILOT_GENERIC,
 		BaseMode:     common.MAV_MODE_FLAG_SAFETY_ARMED,
+		CustomMode:   1,
 		SystemStatus: common.MAV_STATE_ACTIVE,
 	}, now)
 	source.apply(&common.MessageAttitude{
@@ -57,6 +59,9 @@ func TestMAVLinkSourceApplyMessages(t *testing.T) {
 
 	if !state.Health.Has(hud.HealthArmed) {
 		t.Fatal("state should be armed")
+	}
+	if !state.Flight.ModeValid || state.Flight.Mode != "ACRO" {
+		t.Fatalf("flight mode = %v/%q, want valid ACRO", state.Flight.ModeValid, state.Flight.Mode)
 	}
 	if state.Health.Has(hud.HealthTelemetryLost) {
 		t.Fatal("telemetry should be marked present after a message")
@@ -199,6 +204,66 @@ func TestRadioStatusUnknownValues(t *testing.T) {
 	}
 	if state.Radio.WFBRxErrors != 9 || state.Radio.WFBFECFixed != 4 {
 		t.Fatalf("wfb counters = F%d L%d, want F4 L9", state.Radio.WFBFECFixed, state.Radio.WFBRxErrors)
+	}
+}
+
+func TestFlightModeFromHeartbeat(t *testing.T) {
+	tests := []struct {
+		name string
+		msg  common.MessageHeartbeat
+		want string
+	}{
+		{
+			name: "betaflight acro",
+			msg: common.MessageHeartbeat{
+				Autopilot:  common.MAV_AUTOPILOT_GENERIC,
+				CustomMode: 1,
+			},
+			want: "ACRO",
+		},
+		{
+			name: "betaflight stabilize",
+			msg: common.MessageHeartbeat{
+				Autopilot:  common.MAV_AUTOPILOT_GENERIC,
+				CustomMode: 0,
+			},
+			want: "STAB",
+		},
+		{
+			name: "auto flag",
+			msg: common.MessageHeartbeat{
+				BaseMode: common.MAV_MODE_FLAG_AUTO_ENABLED | common.MAV_MODE_FLAG_STABILIZE_ENABLED,
+			},
+			want: "AUTO",
+		},
+		{
+			name: "guided flag",
+			msg: common.MessageHeartbeat{
+				BaseMode: common.MAV_MODE_FLAG_GUIDED_ENABLED,
+			},
+			want: "GUIDED",
+		},
+		{
+			name: "manual flag",
+			msg: common.MessageHeartbeat{
+				BaseMode: common.MAV_MODE_FLAG_MANUAL_INPUT_ENABLED,
+			},
+			want: "MANUAL",
+		},
+		{
+			name: "custom fallback",
+			msg: common.MessageHeartbeat{
+				BaseMode:   common.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED,
+				CustomMode: 42,
+			},
+			want: "CUSTOM 42",
+		},
+	}
+
+	for _, test := range tests {
+		if got := flightMode(&test.msg); got != test.want {
+			t.Fatalf("%s: flightMode() = %q, want %q", test.name, got, test.want)
+		}
 	}
 }
 

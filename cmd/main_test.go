@@ -84,6 +84,17 @@ func TestRadioText(t *testing.T) {
 	}
 }
 
+func TestFlightModeText(t *testing.T) {
+	if got := flightModeText(hud.Flight{}); got != "MODE --" {
+		t.Fatalf("flightModeText() = %q, want %q", got, "MODE --")
+	}
+
+	got := flightModeText(hud.Flight{Mode: "ACRO", ModeValid: true})
+	if got != "MODE ACRO" {
+		t.Fatalf("flightModeText() = %q, want %q", got, "MODE ACRO")
+	}
+}
+
 func TestWFBText(t *testing.T) {
 	base := hud.Radio{
 		WFBRSSIDBm:          -58,

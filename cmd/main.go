@@ -140,6 +140,7 @@ func drawTapeText(screen *ebiten.Image, state hud.State) {
 	drawHUDText(screen, fmt.Sprintf("GPS %s %02d %.1f", state.GPS.FixType, state.GPS.Satellites, state.GPS.HDOP), 44, screenHeight-42, hudGreen)
 	drawHUDText(screen, batteryText(state.Battery), 44, screenHeight-62, hudGreen)
 	drawHUDText(screen, radioText(state.Radio), 44, screenHeight-82, hudGreen)
+	drawHUDText(screen, flightModeText(state.Flight), screenWidth/2-44, 52, hudGreen)
 	drawHUDText(screen, wfbText(state.Radio), screenWidth-168, screenHeight-62, hudGreen)
 	drawHUDText(screen, healthText(state.Health), screenWidth-152, screenHeight-42, hudGreen)
 }
@@ -197,6 +198,13 @@ func radioText(radio hud.Radio) string {
 		return "RC --%"
 	}
 	return fmt.Sprintf("RC %d%%", radio.RCRSSI)
+}
+
+func flightModeText(flight hud.Flight) string {
+	if !flight.ModeValid || flight.Mode == "" {
+		return "MODE --"
+	}
+	return fmt.Sprintf("MODE %s", flight.Mode)
 }
 
 func wfbText(radio hud.Radio) string {

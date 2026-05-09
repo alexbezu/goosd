@@ -57,6 +57,10 @@ func (s *Simulator) State(now time.Time) State {
 			WFBLinkQualityPct:   96,
 			WFBLinkQualityValid: true,
 		},
+		Flight: Flight{
+			Mode:      "ACRO",
+			ModeValid: true,
+		},
 		Health:    HealthArmed,
 		UpdatedAt: now,
 	}

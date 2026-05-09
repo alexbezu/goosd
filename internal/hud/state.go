@@ -12,6 +12,7 @@ type State struct {
 	GPS       GPS
 	Battery   Battery
 	Radio     Radio
+	Flight    Flight
 	Health    Health
 	UpdatedAt time.Time
 }
@@ -51,6 +52,11 @@ type Radio struct {
 	WFBRxErrors         uint16
 	WFBFECFixed         uint16
 	WFBFlags            WFBFlags
+}
+
+type Flight struct {
+	Mode      string
+	ModeValid bool
 }
 
 type WFBFlags uint8
