@@ -4,6 +4,12 @@ GoOSD is a Go/Ebitengine on-screen display for FPV telemetry. It draws a transpa
 
 The application does not decode or receive video packets. Video is expected to be displayed by another process, for example `gst-launch-1.0`. GoOSD listens for MAVLink telemetry over UDP and renders the HUD overlay on top.
 
+Go OSD over a map
+![OSD over a map](assets/osd1.jpg)
+
+Go OSD over FPV video
+![OSD over video](assets/osd2.jpg)
+
 ## Data Flow
 
 Typical OpenIPC/WFB-ng setup:
@@ -47,16 +53,6 @@ gst-launch-1.0 -v udpsrc port=5600 caps='application/x-rtp, media=(string)video,
 | --- | --- | --- |
 | `-mavlink-udp` | empty | UDP listen address for MAVLink telemetry. When empty, GoOSD uses simulated data. Example: `:16000`. |
 | `-click-through` | `false` | Makes the overlay ignore mouse input so clicks pass through to the window underneath. |
-
-## Window Behavior
-
-The Ebitengine window is configured as:
-
-- Transparent
-- Frameless
-- Always on top
-- 960x540 logical HUD canvas
-- Optional mouse click-through
 
 ## HUD Rendering
 
