@@ -23,9 +23,10 @@ const (
 )
 
 var (
-	hudGreen = color.RGBA{R: 96, G: 255, B: 142, A: 230}
-	hudDim   = color.RGBA{R: 96, G: 255, B: 142, A: 120}
-	hudFace  = mustHUDTextFace(16)
+	hudGreen     = color.RGBA{R: 96, G: 255, B: 142, A: 230}
+	hudDim       = color.RGBA{R: 96, G: 255, B: 142, A: 120}
+	hudFace      = mustHUDTextFace(16)
+	hudSmallFace = mustHUDTextFace(13)
 )
 
 type Game struct {
@@ -61,7 +62,7 @@ func drawHUD(screen *ebiten.Image, state hud.State) {
 	cx := float32(screenWidth) / 2
 	cy := float32(screenHeight) / 2
 
-	drawPitchLadder(screen, cx, cy, -state.Attitude.RollDeg, state.Attitude.PitchDeg)
+	drawPitchLadder(screen, cx, cy, -state.Attitude.RollDeg, state.Attitude.PitchDeg, state.Heading.Deg)
 	drawRollScale(screen, cx, cy, state.Attitude.RollDeg)
 	drawReticle(screen, cx, cy)
 	drawTapeText(screen, state)
@@ -74,7 +75,7 @@ func drawReticle(screen *ebiten.Image, cx, cy float32) {
 	vector.FillCircle(screen, cx, cy, 2.5, hudGreen, true)
 }
 
-func drawPitchLadder(screen *ebiten.Image, cx, cy float32, rollDeg, pitchDeg float64) {
+func drawPitchLadder(screen *ebiten.Image, cx, cy float32, rollDeg, pitchDeg, headingDeg float64) {
 	roll := rollDeg * math.Pi / 180
 	sinRoll, cosRoll := math.Sin(roll), math.Cos(roll)
 
@@ -86,14 +87,15 @@ func drawPitchLadder(screen *ebiten.Image, cx, cy float32, rollDeg, pitchDeg flo
 
 		width := float32(96)
 		if mark == 0 {
-			width = 255
+			width = 800
 		}
 		y := float32(offsetY)
 		x0, y0 := rotate(-width/2, y, sinRoll, cosRoll)
 		x1, y1 := rotate(width/2, y, sinRoll, cosRoll)
-		clr := hudGreen
-		if mark != 0 {
-			clr = hudDim
+		clr := hudDim
+		if mark == 0 {
+			clr = hudGreen
+			draw787compass(screen, cx, cy, headingDeg, x0, y0, x1, y1)
 		}
 		vector.StrokeLine(screen, cx+x0, cy+y0, cx+x1, cy+y1, 2, clr, true)
 
@@ -105,6 +107,73 @@ func drawPitchLadder(screen *ebiten.Image, cx, cy float32, rollDeg, pitchDeg flo
 			drawHUDText(screen, label, cx+lx, cy+ly, hudDim)
 		}
 	}
+}
+
+func draw787compass(screen *ebiten.Image, cx, cy float32, headingDeg float64, x0, y0, x1, y1 float32) {
+	const (
+		degreesVisible = 54
+		tickLength     = float32(10)
+		labelGap       = float32(18)
+	)
+
+	dx := x1 - x0
+	dy := y1 - y0
+	lineLength := float32(math.Hypot(float64(dx), float64(dy)))
+	if lineLength == 0 {
+		return
+	}
+
+	ux := dx / lineLength
+	uy := dy / lineLength
+	nx := uy
+	ny := -ux
+	angle := math.Atan2(float64(uy), float64(ux))
+	pxPerDeg := lineLength / degreesVisible
+
+	centerHeading := normalize360(headingDeg)
+	firstTick := math.Floor(centerHeading/10)*10 - degreesVisible/2 - 10
+	lastTick := math.Ceil(centerHeading/10)*10 + degreesVisible/2 + 10
+
+	for tick := firstTick; tick <= lastTick; tick += 10 {
+		rel := compassDeltaDeg(tick, centerHeading)
+		if rel < -degreesVisible/2 || rel > degreesVisible/2 {
+			continue
+		}
+
+		along := float32(rel) * pxPerDeg
+		x := cx + (x0+x1)/2 + ux*along
+		y := cy + (y0+y1)/2 + uy*along
+
+		vector.StrokeLine(screen, x, y, x+nx*tickLength, y+ny*tickLength, 2, hudDim, true)
+
+		heading := int(math.Round(normalize360(tick))) % 360
+		label := fmt.Sprintf("%02d", heading/10)
+		drawHUDTextRotated(screen, label, x+nx*(tickLength+labelGap), y+ny*(tickLength+labelGap), angle, hudDim, hudSmallFace)
+	}
+}
+
+func drawHUDTextRotated(screen *ebiten.Image, value string, x, y float32, angle float64, foreground color.Color, face text.Face) {
+	drawTextRotated(screen, value, x-1, y, angle, color.RGBA{R: 31, G: 127, B: 31, A: 230}, face)
+	drawTextRotated(screen, value, x+1, y, angle, color.RGBA{R: 31, G: 127, B: 31, A: 230}, face)
+	drawTextRotated(screen, value, x, y-1, angle, color.RGBA{R: 31, G: 127, B: 31, A: 230}, face)
+	drawTextRotated(screen, value, x, y+1, angle, color.RGBA{R: 31, G: 127, B: 31, A: 230}, face)
+
+	drawTextRotated(screen, value, x-1, y-1, angle, color.RGBA{R: 0, G: 127, B: 127, A: 210}, face)
+	drawTextRotated(screen, value, x+1, y-1, angle, color.RGBA{R: 0, G: 127, B: 127, A: 210}, face)
+	drawTextRotated(screen, value, x-1, y+1, angle, color.RGBA{R: 0, G: 127, B: 127, A: 210}, face)
+	drawTextRotated(screen, value, x+1, y+1, angle, color.RGBA{R: 0, G: 127, B: 127, A: 210}, face)
+
+	drawTextRotated(screen, value, x, y, angle, foreground, face)
+}
+
+func drawTextRotated(screen *ebiten.Image, value string, x, y float32, angle float64, clr color.Color, face text.Face) {
+	width, height := text.Measure(value, face, 0)
+	options := &text.DrawOptions{}
+	options.GeoM.Translate(-width/2, -height/2)
+	options.GeoM.Rotate(angle)
+	options.GeoM.Translate(float64(x), float64(y))
+	options.ColorScale.ScaleWithColor(clr)
+	text.Draw(screen, value, face, options)
 }
 
 func drawRollScale(screen *ebiten.Image, cx, cy float32, rollDeg float64) {
@@ -204,7 +273,7 @@ func flightModeText(flight hud.Flight) string {
 	if !flight.ModeValid || flight.Mode == "" {
 		return "MODE --"
 	}
-	return fmt.Sprintf("MODE %s", flight.Mode)
+	return flight.Mode
 }
 
 func wfbText(radio hud.Radio) string {
@@ -250,6 +319,14 @@ func normalize360(deg float64) float64 {
 		deg += 360
 	}
 	return deg
+}
+
+func compassDeltaDeg(deg, center float64) float64 {
+	delta := math.Mod(deg-center+540, 360) - 180
+	if delta == -180 {
+		return 180
+	}
+	return delta
 }
 
 func rotate(x, y float32, sin, cos float64) (float32, float32) {
